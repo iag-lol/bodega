@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bodega</title>
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Google API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <!-- Tu archivo CSS -->
+    <link rel="stylesheet" href="../css/bodega.css">
+    <!-- Tu archivo JavaScript -->
+    <script defer src="../js/bodega.js"></script>
+</head>
+
+<body>
+    <header class="bodega-header">
+        <div class="header-title">
+            <h1>Bodega</h1>
+        </div>
+        <div class="user-card">
+            <div class="user-info">
+                <p id="user-name">Nombre: Cargando...</p>
+                <p id="user-role">Cargo: Cargando...</p>
+                <p id="connection-status" class="disconnected">Estado: Cargando...</p>
+            </div>
+            <button id="logout-button" class="btn-logout">Cerrar Sesión</button>
+        </div>
+    </header>
+    <main>
+        <!-- Primera Sección: Contadores -->
+        <section class="section">
+            <div class="counter-section">
+                <div class="counter-card">
+                    <h2 id="counter-stock">0</h2>
+                    <p>Cantidad en Stock</p>
+                </div>
+                <div class="counter-card">
+                    <h2 id="counter-truck">0</h2>
+                    <p>Descargas de Camión</p>
+                </div>
+                <div class="counter-card">
+                    <h2 id="counter-low-stock">0</h2>
+                    <p>Productos Bajo de Stock</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Segunda Sección: Más contenido -->
+        <section class="section">
+            <h2>Entrega de Productos</h2><br>
+            <form id="delivery-form">
+                <label for="product-select">Producto:</label>
+                <select id="product-select" required></select>
+            
+                <label for="delivery-quantity">Cantidad:</label>
+                <input type="number" id="delivery-quantity" placeholder="Cantidad" required />
+            
+                <label for="delivery-person">Nombre del Personal:</label>
+                <input type="text" id="delivery-person" placeholder="Nombre del Personal" required />
+            
+                <label for="delivery-date">Fecha:</label>
+                <input type="text" id="delivery-date" readonly />
+            
+                <label for="delivery-time">Hora:</label>
+                <input type="text" id="delivery-time" readonly />
+            
+                <button type="submit">Registrar Entrega</button>
+            </form>
+        </section>
+
+        
+        <section class="section">
+            <h2>Registro de Entregas</h2>
+            <table id="deliveries-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Cantidad</th>
+                        <th>Fecha</th>
+                        <th>Personal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Aquí se insertarán los datos -->
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+</body>
+
+</html>
