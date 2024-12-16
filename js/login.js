@@ -46,33 +46,68 @@ function loadGapiLibrary() {
 // --- Inicializar Google API ---
 async function initializeGoogleAPI() {
     try {
+        console.log("Inicializando Google Sheets API...");
         await gapi.client.init({
             apiKey: API_KEY,
             clientId: CLIENT_ID,
             discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
-            scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+            scope: SCOPES,
         });
-        console.log("Google API inicializada correctamente.");
+        console.log("Google Sheets API inicializada correctamente.");
     } catch (error) {
-        console.error("Error inicializando Google API:", error);
-        showAlert("Error inicializando Google API. Verifica la configuración en Google Cloud.", "error");
+        console.error("Error inicializando Google Sheets API:", error.message);
+        showAlert("Error inicializando Google Sheets API.", "error");
+        throw error;
+    }
+}
+
+
+async function validateAuth() {
+    const token = localStorage.getItem("googleAuthToken");
+    if (!token) {
+        console.log("Solicitando autenticación...");
+        tokenClient.requestAccessToken({ prompt: "consent" });
+        return;
+    }
+
+    try {
+        const response = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${token}`);
+        if (!response.ok) {
+            console.warn("Token expirado. Solicitando nuevo...");
+            tokenClient.requestAccessToken({ prompt: "consent" });
+        } else {
+            console.log("Token válido.");
+        }
+    } catch (error) {
+        console.error("Error validando el token:", error.message);
+        tokenClient.requestAccessToken({ prompt: "consent" });
     }
 }
 
 // --- Obtener credenciales desde Google Sheets ---
 async function fetchCredentials() {
     try {
+        await validateAuth(); // Verificar autenticación antes de llamar a la API
+
         const response = await gapi.client.sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: RANGE,
+            spreadsheetId: SPREADSHEET_ID, // Asegúrate de que el ID es correcto
+            range: "credenciales!A2:B", // Rango correcto donde están usuario y contraseña
         });
-        return response.result.values || [];
+
+        if (!response.result.values) {
+            console.warn("No se encontraron credenciales en el rango especificado.");
+            showAlert("No hay credenciales disponibles en la hoja.", "warning");
+            return null;
+        }
+
+        console.log("Credenciales cargadas correctamente:", response.result.values);
+        return response.result.values; // Devolver los datos
     } catch (error) {
-        console.error("Error al obtener credenciales:", error);
+        console.error("Error al obtener credenciales:", error.message);
+        showAlert("Error al cargar las credenciales. Verifica los permisos OAuth.", "error");
         return null;
     }
 }
-
 // --- Validar usuario y redirigir ---
 document.getElementById("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -124,19 +159,20 @@ function redirectToPage(role) {
 // --- Inicializar aplicación ---
 document.addEventListener("DOMContentLoaded", async () => {
     try {
-        showAlert("Cargando Google API...", "info");
-        await loadGapiLibrary();
+        await loadGapiLibrary();       // Cargar Google API Library
+        initializeOAuthClient();       // Configurar cliente OAuth
+        await validateAuth();          // Validar autenticación OAuth
+        await initializeGoogleAPI();   // Inicializar Google Sheets API
 
-        showAlert("Inicializando Google API...", "info");
-        await initializeGoogleAPI();
-
-        showAlert("Google API inicializada correctamente.", "success");
+        const credentials = await fetchCredentials(); // Obtener credenciales
+        if (credentials) {
+            console.log("Credenciales cargadas correctamente.");
+        }
     } catch (error) {
-        console.error("Error crítico durante la carga:", error.message);
-        showAlert(`Error crítico: ${error.message}`, "error");
+        console.error("Error durante la inicialización:", error.message);
+        showAlert("Error al inicializar la aplicación.", "error");
     }
 });
-
 
 // --- Configuración de Alertas Mejoradas ---
 function showAlert(message, type = "info") {
