@@ -1,59 +1,54 @@
-// --- Configuración Inicial ---
-const CLIENT_ID = '185859829591-q0g3sceqj3lav0i7j72f2446lcdsbrdr.apps.googleusercontent.com';
-const API_KEY = 'AIzaSyAhPRG0GCJoDG9Q0P3dn6j0eVMw6OsNhPo';
-const SPREADSHEET_ID = '1XDUE-usV_SOiPwlBPRB3RxDbQDRWJau4QBUsQSlVKJA';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+// --- Configuración inicial ---
+const CLIENT_ID = "185859829591-q0g3sceqj3lav0i7j72f2446lcdsbrdr.apps.googleusercontent.com";
+const API_KEY = "AIzaSyAhPRG0GCJoDG9Q0P3dn6j0eVMw6OsNhPo";
+const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+const SPREADSHEET_ID = "1XDUE-usV_SOiPwlBPRB3RxDbQDRWJau4QBUsQSlVKJA";
 
-// --- Variables Globales ---
 let tokenClient;
 
-// --- Mostrar Alertas ---
-function showAlert(message, type = "info") {
-    const existingAlert = document.querySelector(".alert-container");
-    if (existingAlert) return; // Evita mostrar múltiples alertas
-
-    const alertContainer = document.createElement("div");
-    alertContainer.className = `alert-container alert-${type}`;
-    alertContainer.textContent = message;
-
-    document.body.appendChild(alertContainer);
-    setTimeout(() => {
-        alertContainer.classList.add("fade-out");
-        setTimeout(() => alertContainer.remove(), 500);
-    }, 4000);
-}
-
-// --- Inicializar OAuth Client ---
-function initializeOAuthClient() {
+// --- Esperar a que gapi cargue completamente ---
+function loadGapi() {
     return new Promise((resolve) => {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: SCOPES,
-            callback: (response) => {
-                if (response.error) {
-                    console.error("Error en la autenticación:", response.error);
-                    showAlert("Error en la autenticación. Inténtalo de nuevo.", "error");
-                    return;
-                }
-                localStorage.setItem("googleAuthToken", response.access_token);
-                console.log("Autenticación exitosa.");
-                resolve();
-            },
+        gapi.load("client", () => {
+            console.log("Google API cargada correctamente.");
+            resolve();
         });
-        requestAuthToken();
     });
 }
 
-function requestAuthToken() {
-    const token = localStorage.getItem("googleAuthToken");
-    if (!token) {
-        tokenClient.requestAccessToken({ prompt: "consent" });
-    } else {
-        console.log("Token OAuth encontrado en localStorage.");
+// --- Inicializar Google API ---
+async function initializeGoogleAPI() {
+    try {
+        await loadGapi();
+        await gapi.client.init({
+            apiKey: API_KEY,
+            discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
+        });
+        initializeOAuthClient();
+    } catch (error) {
+        console.error("Error inicializando Google API:", error.message);
+        showAlert("Error al inicializar Google API.", "error");
     }
 }
 
-// --- Validar Token OAuth ---
+// --- Inicializar Cliente OAuth ---
+function initializeOAuthClient() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (response) => {
+            if (response.error) {
+                showAlert("Error de autenticación.", "error");
+                return;
+            }
+            localStorage.setItem("googleAuthToken", response.access_token);
+            console.log("Token OAuth almacenado correctamente.");
+        },
+    });
+    validateAuth();
+}
+
+// --- Validar Autenticación ---
 async function validateAuth() {
     const token = localStorage.getItem("googleAuthToken");
     if (!token) {
@@ -61,114 +56,123 @@ async function validateAuth() {
         tokenClient.requestAccessToken({ prompt: "consent" });
         return;
     }
-    console.log("Token válido.");
-}
-
-// --- Cargar Biblioteca GAPI ---
-function loadGapiLibrary() {
-    return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = "https://apis.google.com/js/api.js";
-        script.onload = () => gapi.load("client:auth2", resolve);
-        script.onerror = () => reject("Error al cargar la Google API.");
-        document.head.appendChild(script);
-    });
-}
-
-// --- Inicializar Google Sheets API ---
-async function initializeGoogleAPI() {
+    console.log("Token existente, validando...");
     try {
-        await gapi.client.init({
-            apiKey: API_KEY,
-            discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
-        });
-        console.log("Google Sheets API inicializada.");
-    } catch (error) {
-        console.error("Error inicializando Google Sheets API:", error.message);
-        showAlert("Error inicializando Google API.", "error");
+        const response = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${token}`);
+        if (!response.ok) throw new Error("Token inválido.");
+        console.log("Token válido.");
+    } catch {
+        console.warn("Token inválido. Solicitando nuevo...");
+        tokenClient.requestAccessToken({ prompt: "consent" });
     }
 }
 
-// --- Obtener Credenciales desde Sheets ---
+// --- Mostrar Alertas ---
+function showAlert(message, type = "info") {
+    const alert = document.createElement("div");
+    alert.textContent = message;
+    alert.style = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 10px;
+        background-color: ${type === "error" ? "#f8d7da" : "#d4edda"};
+        color: ${type === "error" ? "#721c24" : "#155724"};
+        border-radius: 8px;
+        z-index: 1000;
+    `;
+    document.body.appendChild(alert);
+    setTimeout(() => alert.remove(), 3000);
+}
+
+// --- Inicialización Principal ---
+document.addEventListener("DOMContentLoaded", async () => {
+    console.log("Iniciando aplicación...");
+    try {
+        await initializeGoogleAPI();
+        console.log("Google API inicializada y lista.");
+    } catch (error) {
+        console.error("Error al iniciar la aplicación:", error.message);
+        showAlert("Error al iniciar la aplicación.", "error");
+    }
+});
+
+
+
+// --- Obtener credenciales desde Google Sheets ---
 async function fetchCredentials() {
     try {
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: "credenciales!A2:B",
+            range: "credenciales!A2:B", // Rango donde están usuario y contraseña
         });
-        return response.result.values || [];
+
+        if (!response.result.values) {
+            console.warn("No se encontraron credenciales.");
+            showAlert("No hay credenciales disponibles.", "warning");
+            return null;
+        }
+
+        console.log("Credenciales obtenidas correctamente.");
+        return response.result.values;
     } catch (error) {
-        console.error("Error al obtener credenciales:", error.message);
-        showAlert("Error al cargar las credenciales.", "error");
-        return [];
+        console.error("Error obteniendo credenciales:", error.message);
+        showAlert("Error al obtener credenciales. Verifica los permisos OAuth.", "error");
+        return null;
     }
 }
 
-// --- Manejar Inicio de Sesión ---
+
+
 document.getElementById("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+
     const username = document.getElementById("username").value;
     const password = document.getElementById("password").value;
 
     const credentials = await fetchCredentials();
+    if (!credentials) {
+        showAlert("Error al cargar las credenciales. Inténtalo más tarde.", "error");
+        return;
+    }
+
+    // Validar credenciales
     const user = credentials.find((row) => row[0] === username && row[1] === password);
 
     if (user) {
-        const userData = { username: user[0], role: user[2] };
+        console.log("Datos del usuario:", user);
+        const userData = {
+            username: user[0],
+            role: user[2] || "bodega", // Valor por defecto si falta el rol
+            terminal: user[3] || "default",
+        };
+
+        // Guardar en localStorage
         localStorage.setItem("user", JSON.stringify(userData));
-        showAlert(`Bienvenido, ${userData.username}!`, "success");
+        showAlert(`Inicio de sesión exitoso. Bienvenido, ${userData.username}!`, "success");
+
+        // Redirigir a la página correcta
         redirectToPage(userData.role);
     } else {
         showAlert("Usuario o contraseña incorrectos.", "error");
     }
 });
 
+// --- Redirigir según el cargo ---
 function redirectToPage(role) {
-    const pages = { bodega: "role/bodega.html", admin: "role/admin.html" };
-    window.location.href = pages[role.toLowerCase()] || "role/default.html";
-}
-
-// --- Cargar Datos del Usuario ---
-function loadUserData() {
-    const userData = JSON.parse(localStorage.getItem("user"));
-    if (userData) {
-        document.getElementById("user-name").textContent = `Nombre: ${userData.username}`;
-        document.getElementById("connection-status").textContent = "Estado: Conectado";
+    if (!role) {
+        console.warn("Rol no definido. Redirigiendo a página por defecto.");
+        window.location.href = "role/default.html";
+        return;
     }
+
+    const rolePages = {
+        "bodega": "role/bodega.html",
+        "administrador": "role/admin.html",
+        "empleado": "role/empleado.html",
+    };
+
+    const destination = rolePages[role.toLowerCase()] || "role/default.html";
+    console.log(`Redirigiendo a: ${destination}`);
+    window.location.href = destination;
 }
-
-// --- Configurar Aplicación ---
-document.addEventListener("DOMContentLoaded", async () => {
-    try {
-        await loadGapiLibrary();
-        await initializeOAuthClient();
-        await validateAuth();
-        await initializeGoogleAPI();
-        loadUserData();
-    } catch (error) {
-        console.error("Error inicializando la aplicación:", error.message);
-        showAlert("Error al inicializar la aplicación.", "error");
-    }
-});
-
-// --- Estilos Dinámicos ---
-const styles = `
-.alert-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 15px 20px;
-    font-weight: bold;
-    border-radius: 8px;
-    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-    z-index: 1000;
-}
-.alert-success { background-color: #d4edda; color: #155724; }
-.alert-error { background-color: #f8d7da; color: #721c24; }
-.fade-out { opacity: 0; transition: opacity 0.5s ease-in-out; }
-`;
-
-const styleSheet = document.createElement("style");
-styleSheet.type = "text/css";
-styleSheet.innerText = styles;
-document.head.appendChild(styleSheet);
