@@ -33,7 +33,7 @@ function initializeOAuthClient() {
 async function validateAuth() {
     const token = localStorage.getItem("googleAuthToken");
     if (!token) {
-        console.log("Token no encontrado. Solicitando un nuevo token...");
+        console.log("Solicitando autenticación...");
         tokenClient.requestAccessToken({ prompt: "consent" });
         return;
     }
@@ -41,16 +41,36 @@ async function validateAuth() {
     try {
         const response = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${token}`);
         if (!response.ok) {
-            console.warn("Token expirado. Solicitando un nuevo token...");
-            tokenClient.requestAccessToken({ prompt: "consent" });
+            console.warn("Token expirado. Refrescando...");
+            tokenClient.requestAccessToken({ prompt: "" });
         } else {
             console.log("Token válido.");
         }
     } catch (error) {
-        console.error("Error validando el token:", error.message);
+        console.error("Error validando el token:", error);
         tokenClient.requestAccessToken({ prompt: "consent" });
     }
 }
+
+
+async function fetchCredentials() {
+    try {
+        await validateAuth(); // Validar autenticación primero
+
+        const response = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: "credenciales!A2:B", // Rango de credenciales: usuarios y contraseñas
+        });
+
+        console.log("Credenciales obtenidas:", response.result.values);
+        return response.result.values || [];
+    } catch (error) {
+        console.error("Error obteniendo credenciales:", error);
+        showAlert("Error al obtener las credenciales. Verifica los permisos OAuth.", "error");
+        return null;
+    }
+}
+
 
 // --- Mostrar Alertas Avanzadas ---
 function showAlert(message, type = "info") {
@@ -119,13 +139,14 @@ async function initializeGoogleAPI() {
         console.log("Inicializando Google API...");
         await gapi.client.init({
             apiKey: API_KEY,
+            clientId: CLIENT_ID,
             discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
+            scope: SCOPES,
         });
         console.log("Google API inicializada correctamente.");
     } catch (error) {
         console.error("Error inicializando Google API:", error);
-        showAlert("Error al inicializar Google API.", "error");
-        throw error;
+        showAlert("Error al inicializar Google API. Verifica los permisos.", "error");
     }
 }
 
