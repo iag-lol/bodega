@@ -19,15 +19,16 @@ function loadGapi() {
 // --- Inicializar Google API ---
 async function initializeGoogleAPI() {
     try {
-        await loadGapi();
+        console.log("Inicializando Google Sheets API...");
         await gapi.client.init({
             apiKey: API_KEY,
             discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
         });
-        initializeOAuthClient();
+        console.log("Google Sheets API inicializada correctamente.");
     } catch (error) {
-        console.error("Error inicializando Google API:", error.message);
-        showAlert("Error al inicializar Google API.", "error");
+        console.error("Error inicializando Google Sheets API:", error.message);
+        showAlert("Error inicializando la API de Google Sheets.", "error");
+        throw error;
     }
 }
 
@@ -102,22 +103,29 @@ document.addEventListener("DOMContentLoaded", async () => {
 // --- Obtener credenciales desde Google Sheets ---
 async function fetchCredentials() {
     try {
+        await validateAuth(); // Asegura que el token es válido
+
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: "credenciales!A2:B", // Rango donde están usuario y contraseña
+            range: "credenciales!A2:B", // Rango de la hoja
         });
 
         if (!response.result.values) {
-            console.warn("No se encontraron credenciales.");
+            console.warn("No se encontraron credenciales en la hoja.");
             showAlert("No hay credenciales disponibles.", "warning");
             return null;
         }
 
-        console.log("Credenciales obtenidas correctamente.");
+        console.log("Credenciales obtenidas correctamente:", response.result.values);
         return response.result.values;
     } catch (error) {
-        console.error("Error obteniendo credenciales:", error.message);
-        showAlert("Error al obtener credenciales. Verifica los permisos OAuth.", "error");
+        console.error("Error obteniendo credenciales:", error);
+
+        if (error.status === 403) {
+            showAlert("Error: Acceso prohibido. Verifica los permisos de la hoja.", "error");
+        } else {
+            showAlert("Error al obtener las credenciales.", "error");
+        }
         return null;
     }
 }
